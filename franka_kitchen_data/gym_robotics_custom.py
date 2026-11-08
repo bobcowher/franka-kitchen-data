@@ -1,7 +1,9 @@
 import numpy as np
 import yaml
 from gymnasium import ObservationWrapper, Wrapper, spaces
-import frames
+from gymnasium_robotics.envs.franka_kitchen.kitchen_env import OBS_ELEMENT_GOALS, OBS_ELEMENT_INDICES
+
+from franka_kitchen_data import frames
 
 
 class HeldSetpointWrapper(Wrapper):
@@ -111,49 +113,6 @@ class VLAObservationWrapper(ObservationWrapper):
             "camera_scene": self._grab(),
             "joint_pos": robot_obs[:9].astype(np.float32),
             "joint_vel": robot_obs[9:18].astype(np.float32),
-        }
-
-
-class ObsReshapeWrapper(ObservationWrapper):
-    """Brings a rendered observation down to the size the policy trained on.
-
-    The collector archives at the render size so a shard stays useful to models
-    that want more pixels than today's network does. Training reduces those
-    shards in load_data; this applies the identical reduction to a live env, so
-    a rollout sees what training saw rather than something a few grey levels off
-    along every edge.
-
-    Outermost wrapper. It reshapes whatever camera_scene the layer below built,
-    so anything that wants full-resolution frames -- recording, debugging --
-    goes below it or leaves it off.
-
-    Frames stay HWC uint8, matching Dataset.sample_batch. That is what the VLM
-    processor takes; it does its own rescale and normalisation, so nothing
-    here should.
-
-    Only camera_scene is touched; joint_pos and joint_vel pass through. Named
-    for reshaping generally because a crop or a normalisation would belong here
-    too -- anything that has to happen identically on both sides of the
-    train/eval line.
-    """
-
-    def __init__(self, env, image_size):
-        super().__init__(env)
-        self.image_size = image_size
-
-        # Fail here rather than on the first step of a rollout.
-        frames.validate(env.observation_space["camera_scene"].shape[0], image_size)
-
-        self.observation_space = spaces.Dict({
-            **env.observation_space.spaces,
-            "camera_scene": spaces.Box(0, 255, (image_size, image_size, 3), np.uint8),
-        })
-
-    def observation(self, observation):
-        return {
-            **observation,
-            "camera_scene": frames.resize(observation["camera_scene"],
-                                          self.image_size),
         }
 
 
@@ -272,3 +231,32 @@ class RandomStartWrapper(Wrapper):
 
         robot_obs = robot._get_obs()
         return kitchen._get_obs(robot_obs), info
+
+
+class FinishedTasksWrapper(Wrapper):
+    """Starts an episode with some other tasks already finished, so demos cover changed scenes."""
+
+    def __init__(self, env, target, tasks=("microwave", "slide cabinet", "hinge cabinet", "top burner"),
+                 max_finished=2, min_fraction=0.8):
+        super().__init__(env)
+        self.candidates = [task for task in tasks if task != target]
+        self.max_finished = max_finished
+        # Finished objects land between this fraction of the way to the goal and the goal itself.
+        self.min_fraction = min_fraction
+        self.finished = []
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        count = np.random.randint(1, self.max_finished + 1) if self.max_finished else 0
+        self.finished = np.random.choice(self.candidates, count, replace=False).tolist()
+
+        kitchen = self.unwrapped
+        qpos = kitchen.data.qpos.copy()
+        for task in self.finished:
+            index = OBS_ELEMENT_INDICES[task]
+            fraction = np.random.uniform(self.min_fraction, 1.0)
+            qpos[index] += fraction * (OBS_ELEMENT_GOALS[task] - qpos[index])
+        kitchen.robot_env.set_state(qpos, kitchen.data.qvel.copy())
+        kitchen.render()
+
+        return kitchen._get_obs(kitchen.robot_env._get_obs()), info

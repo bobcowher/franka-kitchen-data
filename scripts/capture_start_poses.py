@@ -6,8 +6,8 @@ import yaml
 import gymnasium as gym
 import gymnasium_robotics  # registers FrankaKitchen-v1; no longer automatic in gymnasium 1.x
 import pygame
-from gym_robotics_custom import HeldSetpointWrapper
-from controller import Controller
+from franka_kitchen_data.gym_robotics_custom import HeldSetpointWrapper
+from franka_kitchen_data.controller import Controller
 
 # Joystick button, not a keyboard key. Keyboard events need a pygame display
 # surface to attach to, which this script never creates -- keys typed into

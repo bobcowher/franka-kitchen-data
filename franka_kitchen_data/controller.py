@@ -16,6 +16,7 @@ import pygame
 
 ABORT_BUTTON = 4  # Star
 QUIT_BUTTON = 9   # Minus
+DONE_BUTTON = 10  # Plus: assumed from the pad's layout, not measured yet
 
 
 class Controller:
@@ -110,6 +111,14 @@ class Controller:
     def quit_pressed(self):
         """Minus ends the session. Not used by get_action, so it stays free."""
         return bool(self.joystick.get_button(QUIT_BUTTON))
+
+    def done_pressed(self):
+        """Plus marks the task finished. Not used by get_action, so it stays free."""
+        return bool(self.joystick.get_button(DONE_BUTTON))
+
+    def miss_pressed(self):
+        """Any d-pad direction. Not used by get_action, so it stays free."""
+        return self.joystick.get_hat(0) != (0, 0)
 
     def wait_for_release(self):
         """Block until nothing is held, so the next episode starts clean."""

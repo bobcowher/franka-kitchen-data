@@ -1,9 +1,0 @@
-# Pinned together, matching the consumer projects: gymnasium-robotics constrains mujoco tightly.
-mujoco==3.11.0
-gymnasium==1.3.0
-gymnasium-robotics==1.4.2
-
-numpy
-pillow
-pygame
-pyyaml
