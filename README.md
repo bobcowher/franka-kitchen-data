@@ -41,8 +41,8 @@ One shard is one `.npz` episode:
 | `schema_version` | 2 | Absent in version 1 |
 | `finished_tasks` | 2 | Tasks already finished at the start |
 | `exclude_action` | 2 | Per frame: inside a marked fumble |
-| `object_qpos` | 2 | Per frame: sim object joints, for auditing and sim scoring only |
+| `qpos` | 2 | Per frame: the full sim state at that frame (arm then objects), for auditing, sim scoring and re-rendering from another camera |
 
 `dataset.done_labels(shard, task)` gives per-frame labels for a prompt asking for any task.
 
-Training labels must not read `object_qpos`, because a real robot has no equivalent. Frames from the done press onward and `exclude_action` frames should stay out of the action loss.
+Training labels must not read `qpos`, because a real robot has no equivalent. Frames from the done press onward and `exclude_action` frames should stay out of the action loss.

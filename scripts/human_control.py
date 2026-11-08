@@ -88,9 +88,10 @@ class DemoRecorder:
         return None, True
 
     def _step(self, action, done, exclude_action=False):
+        # Taken before stepping, so qpos describes the same moment as self.state's frame.
+        qpos = self.env.unwrapped.data.qpos.copy()
         next_state, reward, _, _, _ = self.env.step(action)
-        object_qpos = self.env.unwrapped.data.qpos[9:]
-        self.memory.store_transition(self.state, action, reward, done, object_qpos, exclude_action)
+        self.memory.store_transition(self.state, action, reward, done, qpos, exclude_action)
         self.state = next_state
         return reward
 

@@ -3,12 +3,12 @@ from datetime import datetime
 
 import numpy as np
 
-# 1 is the original dataset, which has no version field; 2 adds finished_tasks, object_qpos and exclude_action.
+# 1 is the original dataset, which has no version field; 2 adds finished_tasks, qpos and exclude_action.
 SCHEMA_VERSION = 2
 
 
 def done_labels(shard, task):
-    """Done per frame for a prompt asking for task, from an opened shard of either version. Never reads object_qpos."""
+    """Done per frame for a prompt asking for task, from an opened shard of either version. Never reads qpos."""
     name = task.replace(" ", "_")
     if name == str(shard["task_name"]):
         return shard["done"].astype(bool)
@@ -34,13 +34,13 @@ class DatasetShard():
     """
 
     def __init__(self, max_size, image_size, n_actions, task_name,
-                 task_description, finished_tasks=(), n_joints=9, n_objects=21):
+                 task_description, finished_tasks=(), n_joints=9, n_qpos=30):
         self.mem_size = max_size
         self.mem_ctr = 0
         self.task_name = task_name
         self.task_description = task_description
         self.finished_tasks = [task.replace(" ", "_") for task in finished_tasks]
-        self.object_qpos_memory = np.zeros((self.mem_size, n_objects), dtype=np.float32)
+        self.qpos_memory = np.zeros((self.mem_size, n_qpos))
         self.exclude_action_memory = np.zeros(self.mem_size, dtype=bool)
         self.camera_scene_memory = np.zeros(
             (self.mem_size, image_size, image_size, 3), dtype=np.uint8)
@@ -53,7 +53,7 @@ class DatasetShard():
     def __len__(self):
         return self.mem_ctr
 
-    def store_transition(self, state, action, reward, done, object_qpos, exclude_action=False):
+    def store_transition(self, state, action, reward, done, qpos, exclude_action=False):
         if self.mem_ctr >= self.mem_size:
             raise ValueError(
                 f"shard is full at {self.mem_size} steps. Raise max_size to match "
@@ -67,7 +67,7 @@ class DatasetShard():
         self.action_memory[index] = action
         self.reward_memory[index] = reward
         self.terminal_memory[index] = done
-        self.object_qpos_memory[index] = object_qpos
+        self.qpos_memory[index] = qpos
         self.exclude_action_memory[index] = exclude_action
 
         self.mem_ctr += 1
@@ -95,7 +95,7 @@ class DatasetShard():
             np.savez_compressed(fh,
                      schema_version=SCHEMA_VERSION,
                      finished_tasks=np.array(self.finished_tasks, dtype=str),
-                     object_qpos=self.object_qpos_memory[:self.mem_ctr],
+                     qpos=self.qpos_memory[:self.mem_ctr],
                      exclude_action=self.exclude_action_memory[:self.mem_ctr],
                      task_name=self.task_name,
                      task_description=self.task_description,
