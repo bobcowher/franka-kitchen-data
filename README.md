@@ -5,9 +5,9 @@ The FrankaKitchen demo collector and the code that defines its data. Projects co
 ## Install
 
     pip install -e ".[collect]"   # to record, from a clone
-    pip install "franka-kitchen-data @ git+ssh://git@github.com/bobcowher/franka-kitchen-data.git@<commit>"   # in a consumer
+    pip install "franka-kitchen-data @ git+https://github.com/bobcowher/franka-kitchen-data.git@<full commit hash>"   # in a consumer
 
-The second line is what goes in a consumer's `requirements.txt`. Pin the commit.
+The second line is what goes in a consumer's `requirements.txt`. Pin the full commit hash; pip warns on a short one.
 
 ## Recording
 
