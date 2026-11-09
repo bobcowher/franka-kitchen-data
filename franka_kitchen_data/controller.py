@@ -20,7 +20,9 @@ DONE_BUTTON = 10  # Plus: assumed from the pad's layout, not measured yet
 
 
 class Controller:
-    def __init__(self):
+    def __init__(self, buzz_strength=0.6, buzz_seconds=0.25):
+        self.buzz_strength = buzz_strength
+        self.buzz_seconds = buzz_seconds
         self.reset()
 
         pygame.init()
@@ -126,10 +128,19 @@ class Controller:
             pygame.event.pump()
             time.sleep(0.05)
 
+    def buzz(self, pulses=1, length=1):
+        """Rumble the pad. Long means ready for B or X, one short means saved, two short means discarded."""
+        for _ in range(pulses):
+            self.joystick.rumble(self.buzz_strength, self.buzz_strength, 0)
+            time.sleep(self.buzz_seconds * length)
+            self.joystick.stop_rumble()
+            time.sleep(self.buzz_seconds)
+
     def keep_demo(self):
         """Ask whether to save the episode just finished. B keeps, X discards."""
         print("Demo complete. B to keep, X to discard.")
         self.wait_for_release()
+        self.buzz(length=3)
         while True:
             pygame.event.pump()
             if self.joystick.get_button(0):    # B

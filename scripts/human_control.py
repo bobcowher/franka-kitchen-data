@@ -13,8 +13,8 @@ import pygame
 
 from franka_kitchen_data import frames
 from franka_kitchen_data.dataset import DatasetShard
-from franka_kitchen_data.gym_robotics_custom import (ArmHomeWrapper, FinishedTasksWrapper, HeldSetpointWrapper,
-                                                     RandomStartWrapper, VLAObservationWrapper)
+from franka_kitchen_data.gym_robotics_custom import (FinishedTasksWrapper, HeldSetpointWrapper, RandomStartWrapper,
+                                                     VLAObservationWrapper)
 from franka_kitchen_data.tasks import TASKS
 
 
@@ -25,8 +25,7 @@ def make_env(task, render_mode="human", max_finished=2, poses_path="start_poses.
     env = HeldSetpointWrapper(env)
     env = RandomStartWrapper(env, poses_path=poses_path)
     env = FinishedTasksWrapper(env, task, max_finished=max_finished)
-    env = VLAObservationWrapper(env, image_size=frames.RENDER_SIZE)
-    return ArmHomeWrapper(env)
+    return VLAObservationWrapper(env, image_size=frames.RENDER_SIZE)
 
 
 class DemoRecorder:
@@ -48,7 +47,7 @@ class DemoRecorder:
         print(f"\nTask: {TASKS[self.task]}. Already finished: {', '.join(finished) or 'nothing'}.")
         print("Plus marks done, d-pad starts and ends a fumble, Star discards, Minus quits.")
 
-        self.memory = DatasetShard(max_size=self.max_steps + self.hold_steps + env.max_steps + 1,
+        self.memory = DatasetShard(max_size=self.max_steps + self.hold_steps + 1,
                                    image_size=frames.RENDER_SIZE, n_actions=env.action_space.shape[0],
                                    task_name=self.task.replace(" ", "_"), task_description=TASKS[self.task],
                                    finished_tasks=finished)
@@ -66,6 +65,7 @@ class DemoRecorder:
             if controller.abort_pressed():
                 print("Aborted. Discarding episode.")
                 controller.wait_for_release()
+                controller.buzz(2)
                 return None, True
 
             if controller.done_pressed() and self.memory.mem_ctr > 0:
@@ -85,6 +85,7 @@ class DemoRecorder:
             time.sleep(self.step_sleep)
 
         print(f"No done press in {self.max_steps} steps. Discarding episode.")
+        controller.buzz(2)
         return None, True
 
     def _step(self, action, done, exclude_action=False):
@@ -96,21 +97,13 @@ class DemoRecorder:
         return reward
 
     def _finish(self):
-        """After a done press: hold still, go home, and report anything the sim says looks wrong."""
-        print("Done marked. Holding, then going home.")
+        """After a done press: hold still where the task finished, and warn if the sim disagrees."""
+        print("Done marked. Holding.")
         hold_action = np.zeros(self.env.action_space.shape[0])
         for _ in range(self.hold_steps):
             reward = self._step(hold_action, done=True)
         if reward <= 0:
             print("Warning: the sim doesn't count this task as complete.")
-
-        for _ in range(self.env.max_steps):
-            action = self.env.home_action()
-            if action is None:
-                break
-            reward = self._step(action, done=True)
-        if reward <= 0:
-            print("Warning: the sim doesn't count this task as complete after going home.")
         return self.memory
 
 
@@ -135,7 +128,9 @@ if __name__ == "__main__":
                 directory = f"dataset/{args.task.replace(' ', '_')}"
                 shards = len([f for f in os.listdir(directory) if f.endswith(".npz")])
                 print(f"{shards} demos recorded for {args.task}.")
+                controller.buzz()
             else:
                 print("Discarded.")
+                controller.buzz(2)
 
     env.close()
