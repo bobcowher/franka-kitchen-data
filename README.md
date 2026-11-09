@@ -54,7 +54,7 @@ One shard is one `.npz` episode:
 |---|---|---|
 | `task_name`, `task_description` | 1, 2 | The commanded task |
 | `camera_scene`, `joint_pos`, `joint_vel`, `action`, `reward` | 1, 2 | Per frame |
-| `done` | 1, 2 | Version 1: the env's success on the last frame. Version 2: true from the operator's press through the hold. Shards saved before the hold-only change (2026-11-08) also have the trip home marked true |
+| `done` | 1, 2 | Version 1: the env's success on the last frame. Version 2: true from the operator's press through the hold |
 | `schema_version` | 2 | Absent in version 1 |
 | `finished_tasks` | 2 | Tasks already finished at the start |
 | `exclude_action` | 2 | Per frame: inside a marked fumble |
