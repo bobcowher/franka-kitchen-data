@@ -16,6 +16,8 @@ From the repo root, where `dataset` is a symlink to `/data/datasets/franka-kitch
     python scripts/human_control.py "top burner"                     # other tasks start finished
     python scripts/human_control.py "top burner" --max-finished 0    # fresh scene
 
+An open hinge cabinet gets in the way of the other tasks, so it's only already open in about 5% of their demos.
+
 | Pad | Does |
 |---|---|
 | Plus | Ends the demo early, marking it done by hand |
