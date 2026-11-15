@@ -4,10 +4,17 @@ The FrankaKitchen demo collector and the code that defines its data. Projects co
 
 ## Install
 
-    pip install -e ".[collect]"   # to record, from a clone
-    pip install "franka-kitchen-data @ git+https://github.com/bobcowher/franka-kitchen-data.git@<full commit hash>"   # in a consumer
+To record, from a clone:
 
-The second line is what goes in a consumer's `requirements.txt`. Pin the full commit hash; pip warns on a short one.
+    conda create -n franka-kitchen-data python=3.12
+    conda activate franka-kitchen-data
+    pip install -r requirements.txt
+
+`./build.sh "top burner"` then activates the env and starts the collector, passing its arguments through.
+
+In a consumer, this line goes in its `requirements.txt`. Pin the full commit hash; pip warns on a short one.
+
+    franka-kitchen-data @ git+https://github.com/bobcowher/franka-kitchen-data.git@<full commit hash>
 
 ## Recording
 
