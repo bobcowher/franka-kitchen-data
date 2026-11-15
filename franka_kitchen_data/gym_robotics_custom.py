@@ -237,9 +237,12 @@ class FinishedTasksWrapper(Wrapper):
     """Starts an episode with some other tasks already finished, so demos cover changed scenes."""
 
     def __init__(self, env, target, tasks=("microwave", "slide cabinet", "hinge cabinet", "top burner"),
-                 max_finished=2, min_fraction=0.8):
+                 max_finished=2, min_fraction=0.8, blockers=("hinge cabinet",), blocker_chance=0.05):
         super().__init__(env)
-        self.candidates = [task for task in tasks if task != target]
+        # Blockers get in the way of other tasks, so they stay an edge case rather than most of the work.
+        self.blockers = [task for task in blockers if task != target]
+        self.blocker_chance = blocker_chance
+        self.candidates = [task for task in tasks if task != target and task not in blockers]
         self.max_finished = max_finished
         # Finished objects land between this fraction of the way to the goal and the goal itself.
         self.min_fraction = min_fraction
@@ -248,7 +251,10 @@ class FinishedTasksWrapper(Wrapper):
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
         count = np.random.randint(1, self.max_finished + 1) if self.max_finished else 0
-        self.finished = np.random.choice(self.candidates, count, replace=False).tolist()
+        self.finished = []
+        if count and self.blockers and np.random.random() < self.blocker_chance:
+            self.finished.append(str(np.random.choice(self.blockers)))
+        self.finished += np.random.choice(self.candidates, count - len(self.finished), replace=False).tolist()
 
         kitchen = self.unwrapped
         qpos = kitchen.data.qpos.copy()

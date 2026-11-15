@@ -129,18 +129,21 @@ class Controller:
             time.sleep(0.05)
 
     def buzz(self, pulses=1, length=1):
-        """Rumble the pad. Long means ready for B or X, one short means saved, two short means discarded."""
+        """Rumble the pad. One long: ready for B or X. Three long: ready, but the sim says not complete. One short: saved. Two short: discarded."""
         for _ in range(pulses):
             self.joystick.rumble(self.buzz_strength, self.buzz_strength, 0)
             time.sleep(self.buzz_seconds * length)
             self.joystick.stop_rumble()
             time.sleep(self.buzz_seconds)
 
-    def keep_demo(self):
+    def keep_demo(self, sim_complete=True):
         """Ask whether to save the episode just finished. B keeps, X discards."""
-        print("Demo complete. B to keep, X to discard.")
+        if sim_complete:
+            print("Demo complete. B to keep, X to discard.")
+        else:
+            print("\n" + "!" * 60 + "\n  THE SIM DOESN'T COUNT THIS TASK AS COMPLETE.\n  X to discard (likely), B to keep anyway.\n" + "!" * 60)
         self.wait_for_release()
-        self.buzz(length=3)
+        self.buzz(pulses=1 if sim_complete else 3, length=3)
         while True:
             pygame.event.pump()
             if self.joystick.get_button(0):    # B

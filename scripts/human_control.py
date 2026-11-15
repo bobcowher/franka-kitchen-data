@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import gymnasium as gym
 import gymnasium_robotics  # registers FrankaKitchen-v1; no longer automatic in gymnasium 1.x
+from gymnasium_robotics.envs.franka_kitchen.kitchen_env import BONUS_THRESH, OBS_ELEMENT_GOALS, OBS_ELEMENT_INDICES
 import numpy as np
 import pygame
 
@@ -30,12 +31,17 @@ def make_env(task, render_mode="human", max_finished=2, poses_path="start_poses.
 
 class DemoRecorder:
 
-    def __init__(self, env, controller, task, max_steps=500, hold_steps=20, step_sleep=0.05):
+    def __init__(self, env, controller, task, max_steps=500, done_steps=20, step_sleep=0.05, done_delay=6,
+                 done_margin=0.1):
         self.env = env
         self.controller = controller
         self.task = task
         self.max_steps = max_steps
-        self.hold_steps = hold_steps
+        self.done_steps = done_steps  # frames recorded after done is marked, with the operator still driving
+        # Frames between first sim success and marking done, so the object is well inside the sim's band.
+        self.done_delay = done_delay
+        # How far inside the band the object must be at done; the hinge door swings back about 0.05 on release.
+        self.done_margin = done_margin
         self.step_sleep = step_sleep
 
     def record(self):
@@ -45,14 +51,15 @@ class DemoRecorder:
         controller.reset()
         finished = env.get_wrapper_attr("finished")
         print(f"\nTask: {TASKS[self.task]}. Already finished: {', '.join(finished) or 'nothing'}.")
-        print("Plus marks done, d-pad starts and ends a fumble, Star discards, Minus quits.")
+        print("Ends by itself once the sim counts the task complete. Plus ends it early, d-pad starts and ends a fumble, Star discards, Minus quits.")
 
-        self.memory = DatasetShard(max_size=self.max_steps + self.hold_steps + 1,
+        self.memory = DatasetShard(max_size=self.max_steps + self.done_steps + 1,
                                    image_size=frames.RENDER_SIZE, n_actions=env.action_space.shape[0],
                                    task_name=self.task.replace(" ", "_"), task_description=TASKS[self.task],
                                    finished_tasks=finished)
 
         fumbling = miss_held = False
+        success_frame = None
         while self.memory.mem_ctr < self.max_steps:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -79,14 +86,27 @@ class DemoRecorder:
             miss_held = miss
 
             action = controller.get_action()
+            # Letting go of the pad right after success mustn't stall the countdown.
+            if action is None and success_frame is not None:
+                action = np.zeros(env.action_space.shape[0])
             if action is not None:
                 reward = self._step(action, done=False, exclude_action=fumbling)
                 print(f"Episode step: {self.memory.mem_ctr} Reward: {reward}")
+                if reward > 0 and success_frame is None:
+                    success_frame = self.memory.mem_ctr
+                if (success_frame is not None and self.memory.mem_ctr - success_frame >= self.done_delay
+                        and self._goal_distance() <= BONUS_THRESH - self.done_margin):
+                    self.memory.done_source = "sim"
+                    return self._finish(), True
             time.sleep(self.step_sleep)
 
-        print(f"No done press in {self.max_steps} steps. Discarding episode.")
+        print(f"No success or done press in {self.max_steps} steps. Discarding episode.")
         controller.buzz(2)
         return None, True
+
+    def _goal_distance(self):
+        qpos = self.env.unwrapped.data.qpos
+        return np.linalg.norm(qpos[OBS_ELEMENT_INDICES[self.task]] - OBS_ELEMENT_GOALS[self.task])
 
     def _step(self, action, done, exclude_action=False):
         # Taken before stepping, so qpos describes the same moment as self.state's frame.
@@ -97,13 +117,20 @@ class DemoRecorder:
         return reward
 
     def _finish(self):
-        """After a done press: hold still where the task finished, and warn if the sim disagrees."""
-        print("Done marked. Holding.")
-        hold_action = np.zeros(self.env.action_space.shape[0])
-        for _ in range(self.hold_steps):
-            reward = self._step(hold_action, done=True)
-        if reward <= 0:
-            print("Warning: the sim doesn't count this task as complete.")
+        """Once done is marked: keep recording the operator for done_steps frames, all labelled done.
+
+        Whatever the operator does after finishing gives the done head positives with
+        the arm in many poses, not one held pose. sim_complete notes whether the task
+        was still complete at the end."""
+        print(f"Done marked. Keep driving: {self.done_steps} more steps are recorded as done.")
+        for _ in range(self.done_steps):
+            pygame.event.pump()
+            action = self.controller.get_action()
+            if action is None:
+                action = np.zeros(self.env.action_space.shape[0])  # pad released: hold still
+            reward = self._step(action, done=True)
+            time.sleep(self.step_sleep)
+        self.sim_complete = reward > 0
         return self.memory
 
 
@@ -123,7 +150,7 @@ if __name__ == "__main__":
     while running:
         memory, running = recorder.record()
         if memory is not None:
-            if controller.keep_demo():
+            if controller.keep_demo(recorder.sim_complete):
                 memory.save_to_csv()
                 directory = f"dataset/{args.task.replace(' ', '_')}"
                 shards = len([f for f in os.listdir(directory) if f.endswith(".npz")])
