@@ -31,13 +31,13 @@ def make_env(task, render_mode="human", max_finished=2, poses_path="start_poses.
 
 class DemoRecorder:
 
-    def __init__(self, env, controller, task, max_steps=500, hold_steps=20, step_sleep=0.05, done_delay=6,
+    def __init__(self, env, controller, task, max_steps=500, done_steps=20, step_sleep=0.05, done_delay=6,
                  done_margin=0.1):
         self.env = env
         self.controller = controller
         self.task = task
         self.max_steps = max_steps
-        self.hold_steps = hold_steps
+        self.done_steps = done_steps  # frames recorded after done is marked, with the operator still driving
         # Frames between first sim success and marking done, so the object is well inside the sim's band.
         self.done_delay = done_delay
         # How far inside the band the object must be at done; the hinge door swings back about 0.05 on release.
@@ -53,7 +53,7 @@ class DemoRecorder:
         print(f"\nTask: {TASKS[self.task]}. Already finished: {', '.join(finished) or 'nothing'}.")
         print("Ends by itself once the sim counts the task complete. Plus ends it early, d-pad starts and ends a fumble, Star discards, Minus quits.")
 
-        self.memory = DatasetShard(max_size=self.max_steps + self.hold_steps + 1,
+        self.memory = DatasetShard(max_size=self.max_steps + self.done_steps + 1,
                                    image_size=frames.RENDER_SIZE, n_actions=env.action_space.shape[0],
                                    task_name=self.task.replace(" ", "_"), task_description=TASKS[self.task],
                                    finished_tasks=finished)
@@ -117,11 +117,19 @@ class DemoRecorder:
         return reward
 
     def _finish(self):
-        """Once done is marked: hold still where the task finished, and note whether the sim agrees."""
-        print("Done marked. Holding.")
-        hold_action = np.zeros(self.env.action_space.shape[0])
-        for _ in range(self.hold_steps):
-            reward = self._step(hold_action, done=True)
+        """Once done is marked: keep recording the operator for done_steps frames, all labelled done.
+
+        Whatever the operator does after finishing gives the done head positives with
+        the arm in many poses, not one held pose. sim_complete notes whether the task
+        was still complete at the end."""
+        print(f"Done marked. Keep driving: {self.done_steps} more steps are recorded as done.")
+        for _ in range(self.done_steps):
+            pygame.event.pump()
+            action = self.controller.get_action()
+            if action is None:
+                action = np.zeros(self.env.action_space.shape[0])  # pad released: hold still
+            reward = self._step(action, done=True)
+            time.sleep(self.step_sleep)
         self.sim_complete = reward > 0
         return self.memory
 
