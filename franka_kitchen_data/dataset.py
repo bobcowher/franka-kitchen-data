@@ -40,6 +40,7 @@ class DatasetShard():
         self.task_name = task_name
         self.task_description = task_description
         self.finished_tasks = [task.replace(" ", "_") for task in finished_tasks]
+        self.done_source = "press"
         self.qpos_memory = np.zeros((self.mem_size, n_qpos))
         self.exclude_action_memory = np.zeros(self.mem_size, dtype=bool)
         self.camera_scene_memory = np.zeros(
@@ -95,6 +96,7 @@ class DatasetShard():
             np.savez_compressed(fh,
                      schema_version=SCHEMA_VERSION,
                      finished_tasks=np.array(self.finished_tasks, dtype=str),
+                     done_source=self.done_source,
                      qpos=self.qpos_memory[:self.mem_ctr],
                      exclude_action=self.exclude_action_memory[:self.mem_ctr],
                      task_name=self.task_name,

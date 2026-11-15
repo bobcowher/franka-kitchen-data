@@ -18,7 +18,7 @@ From the repo root, where `dataset` is a symlink to `/data/datasets/franka-kitch
 
 | Pad | Does |
 |---|---|
-| Plus | Marks the task done and ends the demo |
+| Plus | Ends the demo early, marking it done by hand |
 | D-pad | Starts or ends a fumble. Its frames stay out of the action loss |
 | B / X at the end | Keep / discard |
 | Star | Discards the episode and starts the next one |
@@ -26,17 +26,15 @@ From the repo root, where `dataset` is a symlink to `/data/datasets/franka-kitch
 
 ### One demo
 
-1. Do the task. Sim success does not end the demo, so keep going until the task looks finished.
-2. Press Plus. Your press is the done label, so press when you would tell the robot to stop.
-3. Let go. The collector records 20 frames holding still where the task finished. The trip home is not recorded, because the done signal has to come before the arm leaves, not from the arm being home.
-4. Wait for a long buzz, then press B to save or X to throw it away. A press before the buzz is ignored.
-5. The pad buzzes once when a demo is saved and twice when one is discarded, then the next episode starts. The arm usually looks the same either way, so go by the buzz.
+1. Do the task. The demo ends by itself once the sim has counted the task complete for 6 frames and the object is at least 0.1 inside the sim's 0.3 band, and then the pad stops controlling the arm. Keep pushing past the point where it first counts. The hinge door swings back about 0.05 when you let go.
+2. The collector records 20 frames holding still where the task finished. The trip home is not recorded, because the done signal has to come before the arm leaves, not from the arm being home.
+3. Wait for the buzz, then press B to save or X to throw it away. A press before the buzz is ignored. **One long buzz** means all is well. **Three long buzzes** mean the sim doesn't count the task as complete, so X is probably right.
+4. The pad buzzes once when a demo is saved and twice when one is discarded, then the next episode starts. The arm usually looks the same either way, so go by the buzz.
 
 Good to know:
 
-- A warning that the sim doesn't count the task as complete means you pressed before it passed the sim's threshold. Discard the demo with X unless you meant to keep it.
 - If you make a mistake but can recover, press the d-pad, recover, and press the d-pad again. Star is for an episode that isn't worth saving.
-- Steps only count while the pad is moving the arm. After 500 steps with no Plus press, the episode is discarded.
+- Steps only count while the pad is moving the arm. After 500 steps without success or a Plus press, the episode is discarded.
 - Minus never saves. Finish with B first if you want the demo.
 
 ### Sending the data
@@ -54,12 +52,13 @@ One shard is one `.npz` episode:
 |---|---|---|
 | `task_name`, `task_description` | 1, 2 | The commanded task |
 | `camera_scene`, `joint_pos`, `joint_vel`, `action`, `reward` | 1, 2 | Per frame |
-| `done` | 1, 2 | Version 1: the env's success on the last frame. Version 2: true from the operator's press through the hold |
+| `done` | 1, 2 | Version 1: the env's success on the last frame. Version 2: true from the moment done is marked through the hold |
 | `schema_version` | 2 | Absent in version 1 |
+| `done_source` | 2 | `sim`: at least 6 frames after first success, with the object at least 0.1 inside the band (from 2026-11-09). `press`: a Plus press; shards without this field are also presses. `sim_trimmed`: a press demo that ended outside the sim's band, cut back to where it left the band, with no hold. Originals are in `/data/datasets/franka-kitchen-v2-originals` |
 | `finished_tasks` | 2 | Tasks already finished at the start |
 | `exclude_action` | 2 | Per frame: inside a marked fumble |
 | `qpos` | 2 | Per frame: the full sim state at that frame (arm then objects), for auditing, sim scoring and re-rendering from another camera |
 
 `dataset.done_labels(shard, task)` gives per-frame labels for a prompt asking for any task.
 
-Training labels must not read `qpos`, because a real robot has no equivalent. Frames from the done press onward and `exclude_action` frames should stay out of the action loss.
+Sim done labels are a sim-only choice: a real robot has no equivalent, so its demos will use the Plus press. Training code must not read `qpos`. Done frames and `exclude_action` frames should stay out of the action loss.
