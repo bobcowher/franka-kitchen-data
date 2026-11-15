@@ -63,4 +63,14 @@ One shard is one `.npz` episode:
 
 `dataset.done_labels(shard, task)` gives per-frame labels for a prompt asking for any task.
 
-Sim done labels are a sim-only choice: a real robot has no equivalent, so its demos will use the Plus press. Training code must not read `qpos`. Done frames and `exclude_action` frames should stay out of the action loss.
+Sim done labels are a sim-only choice: a real robot has no equivalent, so its demos will use the Plus press. Training code must not read `qpos`. Done frames and `exclude_action` frames should stay out of the action loss, but done frames must still reach the done head.
+
+### Frozen done frames
+
+Before 2026-11-14 the collector disconnected the pad on done and held the arm still, so those done frames are near-identical zero-action copies. From 2026-11-14 the operator keeps driving through them. A shard is frozen when every done frame's `action` is exactly zero, which no piloted shard has. Counted on the 397 shards in `franka-kitchen-v2-397`:
+
+| Kind | Shards | Recorded | Done frames per shard | Done-frame mean abs(action) | Joint motion per step, done vs the 20 frames before |
+|---|---|---|---|---|---|
+| Frozen hold | 259 (hinge 59, microwave 101, slide 74, burner 25) | 2026-11-08 to 11-11 | 20 | 0.000 | 0.0012 vs 0.0103 |
+| Piloted, `sim` | 87 (hinge 44, microwave 43) | 2026-11-14 | 20 | 0.181 | 0.0057 vs 0.0108 |
+| `sim_trimmed` | 51 (burner 49, microwave 2) | 2026-11-08 | 5.7 | 0.331 | 0.0081 vs 0.0089 |
