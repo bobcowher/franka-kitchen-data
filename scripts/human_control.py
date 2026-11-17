@@ -1,6 +1,6 @@
 """Record demos with the controller. Usage: python scripts/human_control.py <task> [--max-finished N]
 
-A close task (e.g. close_slide_cabinet) starts with its object open and ends once it is shut."""
+A close task (e.g. "close slide cabinet") starts with its object open and ends once it is shut."""
 import argparse
 import os
 import sys
