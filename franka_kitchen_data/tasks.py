@@ -15,6 +15,11 @@ TASKS = {
     "hinge cabinet": "Open the cabinet second from the left",    # travel 1.15
 }
 
+# Each reverses an env task on the same object. The env only knows the seven
+# above, so it is built for that object and the recorder checks the close itself.
+CLOSE_TASKS = {"close slide cabinet": "slide cabinet"}
+DESCRIPTIONS = {**TASKS, "close slide cabinet": "Slide the cabinet door shut"}
+
 # Dict order is what task_index()'s integer ids mean, so reordering TASKS
 # silently invalidates every checkpoint trained before the change.
 TASK_DESCRIPTIONS = list(TASKS.values())

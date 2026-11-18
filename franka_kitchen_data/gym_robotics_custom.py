@@ -237,8 +237,11 @@ class FinishedTasksWrapper(Wrapper):
     """Starts an episode with some other tasks already finished, so demos cover changed scenes."""
 
     def __init__(self, env, target, tasks=("microwave", "slide cabinet", "hinge cabinet", "top burner"),
-                 max_finished=2, min_fraction=0.8, blockers=("hinge cabinet",), blocker_chance=0.05):
+                 max_finished=2, min_fraction=0.8, blockers=("hinge cabinet",), blocker_chance=0.05,
+                 start_open=False):
         super().__init__(env)
+        self.target = target
+        self.start_open = start_open  # close demos: the target starts open too, and isn't listed as finished
         # Blockers get in the way of other tasks, so they stay an edge case rather than most of the work.
         self.blockers = [task for task in blockers if task != target]
         self.blocker_chance = blocker_chance
@@ -258,7 +261,7 @@ class FinishedTasksWrapper(Wrapper):
 
         kitchen = self.unwrapped
         qpos = kitchen.data.qpos.copy()
-        for task in self.finished:
+        for task in self.finished + ([self.target] if self.start_open else []):
             index = OBS_ELEMENT_INDICES[task]
             fraction = np.random.uniform(self.min_fraction, 1.0)
             qpos[index] += fraction * (OBS_ELEMENT_GOALS[task] - qpos[index])
