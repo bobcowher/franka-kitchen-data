@@ -53,7 +53,9 @@ Push new shards to lab with `scripts/sync_data.sh`.
 ## Data
 
 - `/data/datasets/franka-kitchen-bc`: version 1, frozen. Called `farama-kitchen-bc/dataset` on lab.
-- `/data/datasets/franka-kitchen-v2`: version 2.
+- `/data/datasets/franka-kitchen-v2`: version 2, piloted done frames only. Training reads this folder.
+- `/data/datasets/franka-kitchen-v2-frozen`: the 259 frozen-done shards (see below), kept out of training.
+- `/data/datasets/franka-kitchen-v2-sim-trimmed`: the 51 `sim_trimmed` shards, kept out of training. Burner trained on these reaches success and then undoes it.
 
 One shard is one `.npz` episode:
 
@@ -74,7 +76,7 @@ Sim done labels are a sim-only choice: a real robot has no equivalent, so its de
 
 ### Frozen done frames
 
-Before 2026-11-14 the collector disconnected the pad on done and held the arm still, so those done frames are near-identical zero-action copies. From 2026-11-14 the operator keeps driving through them. A shard is frozen when every done frame's `action` is exactly zero, which no piloted shard has. Counted on the 397 shards in `franka-kitchen-v2-397`:
+Before 2026-11-14 the collector disconnected the pad on done and held the arm still, so those done frames are near-identical zero-action copies. From 2026-11-14 the operator keeps driving through them. A shard is frozen when it was recorded before 2026-11-14 and every done frame's `action` is exactly zero. A piloted shard can also be all zero when the operator holds the arm still at the goal, so the date is part of the rule. Counted on the 397 shards in `franka-kitchen-v2-397`:
 
 | Kind | Shards | Recorded | Done frames per shard | Done-frame mean abs(action) | Joint motion per step, done vs the 20 frames before |
 |---|---|---|---|---|---|
